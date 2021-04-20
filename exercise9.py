@@ -24,12 +24,14 @@ Tasks:
 5. @DONE Check that with 10 hidden layers (64 units each) even with proper
     initialization the network has a hard time to start learning.
 
-6. Implement batch normalization (use train mode also for testing
+6. @DONE Implement batch normalization (use train mode also for testing
        - it should perform well enough):
     * compute batch mean and variance
     * add new variables beta and gamma
     * check that the networks learns much faster for 5 layers
     * check that the network learns even for 10 hidden layers.
+    #https://pytorch.org/docs/master/generated/torch.nn.BatchNorm1d.html#torch.nn.BatchNorm1d
+
 
 Bonus task:
 
@@ -81,23 +83,25 @@ class Linear(torch.nn.Module):
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()#64-64-64-64-64-10
-#        self.fc1 = Linear(784, 64)
-#        self.fc2 = Linear(64, 64)
         self.fc3 = Linear(64, 10)
         self.dropout = nn.Dropout(0.25)
         self.linears = nn.ModuleList([
             Linear(784, 64)
         ])
         [self.linears.append(Linear(64, 64)) for x in range(10)]
+    
     def forward(self, x):
         x = x.view(-1, 28 * 28)
         for l in self.linears:
-            x = F.relu(l(x))
+            x = F.relu(self.bnormalizaction(l(x)))
             x = self.dropout(x)
 
         x = self.fc3(x)
         return x
-
+    
+    def bnormalizaction(self, x):
+        eps = 1e-5
+        return (x - x.mean(dim=0)) / (x.var(dim=0) + eps).sqrt()
 
 MB_SIZE = 128
 
