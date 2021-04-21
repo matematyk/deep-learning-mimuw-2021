@@ -6,17 +6,17 @@ Note: during the next lab session we will go one level deeper and implement more
 with bare hands.
 
 Tasks:
-    1. Read the code.
+    1. @DONE, Read the code.
 
-    2. Check that the given implementation reaches 95% test accuracy for
+    2. @DONE Check that the given implementation reaches 95% test accuracy for
    architecture input-128-128-10 after one epoch.
 
-    3. Add the option to use SGD with momentum instead of ADAM.
+    3. @DONE Add the option to use SGD with momentum instead of ADAM.
 
-    4. Experiment with different learning rates, plot the learning curves for different
+    4. @DONE 0.01 vs 0.09 Experiment with different learning rates, plot the learning curves for different
     learning rates for both ADAM and SGD with momentum.
 
-    5. Parameterize the constructor by a list of sizes of hidden layers of the MLP.
+    5. @DONE Parameterize the constructor by a list of sizes of hidden layers of the MLP.
     Note that this requires creating a list of layers as an atribute of the Net class,
     and one can't use a standard python list containing nn.Modules (why?).
     Check torch.nn.ModuleList.
@@ -41,14 +41,13 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(784, 128)
         self.fc2 = nn.Linear(128, 128)
         self.fc3 = nn.Linear(128, 10)
+        self.linears = nn.ModuleList([self.fc1, self.fc2, self.fc3])
 
     def forward(self, x):
         x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
-        x = self.fc3(x)
+        for l in self.linears:
+            x = l(x)
+            x = F.relu(x)
         output = F.log_softmax(x, dim=1)
         return output
 
@@ -132,7 +131,8 @@ def main():
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
 
     model = Net().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    #optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
 
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch)
