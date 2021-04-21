@@ -82,18 +82,20 @@ class Linear(torch.nn.Module):
 
 class Net(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()#64-64-64-64-64-10
+        super(Net, self).__init__()
         self.fc3 = Linear(64, 10)
         self.dropout = nn.Dropout(0.25)
         self.linears = nn.ModuleList([
             Linear(784, 64)
         ])
-        [self.linears.append(Linear(64, 64)) for x in range(10)]
+        [self.linears.append(Linear(64, 64)) for x in range(1)]
     
     def forward(self, x):
         x = x.view(-1, 28 * 28)
         for l in self.linears:
-            x = F.relu(self.bnormalizaction(l(x)))
+            x = self.bnormalizaction(l(x))
+            #x = l(x)
+            x = F.relu(x)
             x = self.dropout(x)
 
         x = self.fc3(x)
