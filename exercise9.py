@@ -35,7 +35,7 @@ Tasks:
 
 Bonus task:
 
-Design and implement in pytorch (by using pytorch functions)
+@DONE Design and implement in pytorch (by using pytorch functions)
    a simple convnet and achieve 99% test accuracy.
 
 Note:
@@ -53,17 +53,18 @@ def truncated_normal_(tensor, mean=0, std=1):
     tensor.data.copy_(tmp.gather(-1, ind).squeeze(-1))
     tensor.data.mul_(std).add_(mean)
 
-
+'''
+https://pytorch.org/docs/stable/nn.init.html
+'''
 class Linear(torch.nn.Module):
     def __init__(self, in_features, out_features):
         super(Linear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        #https://pytorch.org/docs/stable/nn.init.html
         if True:
             w = torch.empty(out_features, in_features) 
-            torch.nn.init.xavier_normal_(w)
-            self.weight = Parameter(w) #randn
+            torch.nn.init.xavier_normal_(w) # gain * sqrt(2/(in+out))
+            self.weight = Parameter(w) 
             self.bias = Parameter(torch.randn(out_features)) #rand
         else:
             self.weight = Parameter(torch.Tensor(out_features, in_features))
@@ -93,8 +94,8 @@ class Net(nn.Module):
     def forward(self, x):
         x = x.view(-1, 28 * 28)
         for l in self.linears:
-            x = self.bnormalizaction(l(x))
-            #x = l(x)
+            x = l(x)
+            x = self.bnormalizaction(x)
             x = F.relu(x)
             x = self.dropout(x)
 
@@ -103,7 +104,8 @@ class Net(nn.Module):
     
     def bnormalizaction(self, x):
         eps = 1e-5
-        return (x - x.mean(dim=0)) / (x.var(dim=0) + eps).sqrt()
+        #(x.var(dim=0) + eps).sqrt()
+        return (x - x.mean(dim=0)) / (x.std(dim=0) + eps)
 
 MB_SIZE = 128
 
@@ -128,7 +130,7 @@ class MnistTrainer(object):
             self.testset, batch_size=1, shuffle=False, num_workers=4)
 
     def train(self):
-        net = Net()
+        net = NetConv()
 
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(net.parameters(), lr=0.05, momentum=0.9)
@@ -151,6 +153,7 @@ class MnistTrainer(object):
                     running_loss = 0.0
             correct = 0
             total = 0
+            net.eval()
             with torch.no_grad():
                 for data in self.testloader:
                     images, labels = data
@@ -162,6 +165,30 @@ class MnistTrainer(object):
             print('Accuracy of the network on the {} test images: {} %'.format(
                 total, 100 * correct / total))
 
+class NetConv(nn.Module):
+    def __init__(self):
+        super(NetConv, self).__init__()
+        modules = []
+
+        modules.append(nn.Conv2d(1, 16, 3, padding=1))
+        modules.append(nn.BatchNorm2d(16))
+        modules.append(nn.ReLU())
+        modules.append(nn.MaxPool2d(2))
+
+        modules.append(nn.Conv2d(16, 32, 3, padding=1))
+        modules.append(nn.BatchNorm2d(32))
+        modules.append(nn.ReLU())
+        modules.append(nn.MaxPool2d(2))
+
+        modules.append(nn.Flatten())
+        modules.append(nn.Linear(32 * 7 * 7, 10))
+
+        self.layers = nn.Sequential(*modules)
+
+    def forward(self, x):
+        x = self.layers(x)
+
+        return x
 
 def main():
     trainer = MnistTrainer()
@@ -170,3 +197,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+
