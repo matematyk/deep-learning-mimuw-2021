@@ -37,60 +37,64 @@ def sigmoid_prime(z):
 
 
 class Network(object):
-    def __init__(self, sizes):
+    def __init__(self, sizes, degrees):
         # initialize biases and weights with random normal distr.
         # weights are indexed by target node first
+        assert len(sizes)-1 == len(degrees)
         self.num_layers = len(sizes)
         self.sizes = sizes
+        self.degrees = degrees
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) 
                         for x, y in zip(sizes[:-1], sizes[1:])]
 
-    def feedforward(self, a):
+    def feedforward(self, a, connections):
         # Run the network on a batch
         a = a.T
-        for b, w in zip(self.biases, self.weights):
-            a = sigmoid(np.matmul(w, a)+b)
+        for b, w, c in zip(self.biases, self.weights, connections):
+            a = sigmoid(np.matmul(w[:,c], a[c,:])+b)
         return a
     
-    def update_mini_batch(self, mini_batch, eta):
+    def update_mini_batch(self, mini_batch, eta, connections):
         # Update networks weights and biases by applying a single step
         # of gradient descent using backpropagation to compute the gradient.
         # The gradient is computed for a mini_batch which is as in tensorflow API.
         # eta is the learning rate      
-        nabla_b, nabla_w = self.backprop(mini_batch[0].T,mini_batch[1].T)
+        nabla_b, nabla_w = self.backprop(mini_batch[0].T,mini_batch[1].T, connections)
             
-        self.weights = [w-(eta/len(mini_batch[0]))*nw 
-                        for w, nw in zip(self.weights, nabla_w)]
+        #self.weights = [w[:,c]-(eta/len(mini_batch[0]))*nw 
+        #                for w, nw, c in zip(self.weights, nabla_w, connections)]
+        for i in range(len(self.weights)):
+            self.weights[i][:,connections[i]] -= (eta/len(mini_batch[0]))*nabla_w[i]
+
         self.biases = [b-(eta/len(mini_batch[0]))*nb 
                        for b, nb in zip(self.biases, nabla_b)]
         
-    def backprop(self, x, y):
+    def backprop(self, x, y, connections):
         # For a mini-batch of (x,y) return a pair of lists.
         # First contains gradients over biases, second over weights.
-        g = x
-        gs = [g] # list to store all the gs, layer by layer
+        gs = [x] # list to store all the gs, layer by layer
         fs = [] # list to store all the fs, layer by layer
-        for b, w in zip(self.biases, self.weights):
-            f = np.dot(w, g)+b
+        for b, w, c in zip(self.biases, self.weights, connections):
+            gs[-1] = gs[-1][c,:]
+            f = np.dot(w[:,c], gs[-1])+b
             fs.append(f)
-            g = sigmoid(f)
-            gs.append(g)
+            gs.append(sigmoid(f))
         # backward pass 
         dLdg = self.cost_derivative(gs[-1], y)
         dLdfs = []
-        for w,g in reversed(list(zip(self.weights,gs[1:]))):
-            dLdf = np.multiply(dLdg,np.multiply(g,1-g))
+        for w, g, c1, c2 in reversed(list(zip(self.weights, gs[1:], connections[:-1], connections[1:]))):
+            dLdf = np.multiply(dLdg, np.multiply(g,1-g))
             dLdfs.append(dLdf)
-            dLdg = np.matmul(w.T, dLdf)
+            dLdg = np.matmul(w[np.ix_(c2, c1)].T, dLdf)
         
         dLdWs = [np.matmul(dLdf,g.T) for dLdf,g in zip(reversed(dLdfs),gs[:-1])]
         dLdBs = [np.sum(dLdf,axis=1).reshape(dLdf.shape[0],1) for dLdf in reversed(dLdfs)] 
         return (dLdBs,dLdWs)
 
-    def evaluate(self, test_data):
+    def evaluate(self, test_data, connections):
         # Count the number of correct answers for test_data
-        pred = np.argmax(self.feedforward(test_data[0]),axis=0)
+        pred = np.argmax(self.feedforward(test_data[0], connections),axis=0)
         corr = np.argmax(test_data[1],axis=1).T
         return np.mean(pred==corr)
     
@@ -101,19 +105,23 @@ class Network(object):
         x_train, y_train = training_data
         if test_data:
             x_test, y_test = test_data
+        connections = [] #trzyma indeksy, które indeksy wybiore
+        for size, degree in zip(self.sizes[:-1], self.degrees):
+            assert degree <= size
+            connections.append(random.sample(range(size), degree))
         for j in range(epochs):
             for i in range(x_train.shape[0] // mini_batch_size):
                 x_mini_batch = x_train[(mini_batch_size*i):(mini_batch_size*(i+1))]
                 y_mini_batch = y_train[(mini_batch_size*i):(mini_batch_size*(i+1))]
-                self.update_mini_batch((x_mini_batch, y_mini_batch), eta)
+                self.update_mini_batch((x_mini_batch, y_mini_batch), eta, connections)
             if test_data:
-                print("Epoch: {0}, Accuracy: {1}".format(j, self.evaluate((x_test, y_test))))
+                print("Epoch: {0}, Accuracy: {1}".format(j, self.evaluate((x_test, y_test), connections)))
             else:
                 print("Epoch: {0}".format(j))
 
 
-network = Network([784,30,10])
+#network = Network([784,30,10])
 # The above line should probably change to:
-#network = Network([784,100,10],[200,100])
+network = Network([784,100,10],[100,50])
 
 network.SGD((x_train, y_train), epochs=30, mini_batch_size=100, eta=3.0, test_data=(x_test, y_test))
